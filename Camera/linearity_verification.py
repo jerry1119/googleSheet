@@ -1,0 +1,156 @@
+exec(open('./conveniencefuncs.py').read())
+#*************************
+#start here
+expected_dot_size = 2700
+ret = InitializeCamera()
+if(ret==1):
+    #Turn all LEDs to 100% duty cycle, perform auto-exposure
+    RunShellOnChirp(all_on_filename)
+    AutoExposure()
+    #Capture bright and dark images, calculate dark-subtracted image
+    all_on_img = GetPictureReliably()
+    RunShellOnChirp(all_dark_filename)
+    time.sleep(1)
+    all_dark_img = GetPictureReliably()
+    all_on_ds_img = cv.addWeighted(all_on_img, 1.0, all_dark_img, -1.0, 0.0)
+    #Detect dots locations and sizes
+    w_stats = DotStats(all_on_ds_img)
+    w_stats.DetectAnalyze(expected_dot_size, False, False)
+    print(w_stats.dot_sizes)
+    print(w_stats.rgbvalues)
+    print(w_stats.coordinates)
+    cv.imwrite('w_original.jpg', all_on_ds_img)
+    w_stats.MaskImage()
+    cv.imwrite('w_masked.jpg', all_on_ds_img)
+    w_stats.AddNotation()
+    cv.imwrite('w_notated.jpg', all_on_ds_img)
+    dot_coordinates = w_stats.coordinates
+    dot_sizes = w_stats.dot_sizes
+    num_dots = w_stats.num_dots
+    RunShellOnChirp(four_dots_filename)
+    imgdata = GetPictureReliably()
+    cv.imwrite('four_dots.jpg', imgdata)
+    #######################################
+    #Begin linearity verification for both PWM and IREF
+    #to avoid temperature variation, keep duty cycle below 10%
+    sleeptime = 10
+    numLEDs = 12
+    #specify brightness levels to be swept
+    a1 = np.arange(0,50,5)
+    a2 = np.arange(50,256,15)
+    brightnesslevels = np.append(a1,a2)
+    if np.max(brightnesslevels) < 255:
+        brightnesslevels = np.append(brightnesslevels, 255)
+    brightnesslevels = np.arange(0,256,17)
+    ##
+    numsteps = len(brightnesslevels)
+    pwm_data = np.zeros((numLEDs,numsteps,3))
+    iref_data = np.zeros((numLEDs,numsteps,3))
+    for i in range(numsteps):
+        brightnesslevel = brightnesslevels[i]
+        sleeptime = brightnesslevel*1.0/255*10+1
+        #get dark frame for this series
+        time.sleep(1)
+        RunShellOnChirp(all_dark_filename)
+        all_dark_img = GetPictureReliably()
+        #Gather PWM data, variable duty cycle
+        for colorindex in range(3):
+            print('*************************************')
+            print('brightness level %d, PWM, colorindex:%d' \
+                % (brightnesslevel,colorindex))
+            if colorindex == 0:
+                RunShellOnChirp(mode10r_filename)
+            if colorindex == 1:
+                RunShellOnChirp(mode10g_filename)
+            if colorindex == 2:
+                RunShellOnChirp(mode10b_filename)
+            Mode10SetBrightness(brightnesslevel)
+            imgdata = GetPictureReliably()
+            imgdata_ds = cv.addWeighted(imgdata, 1.0, all_dark_img, -1.0, 0.0)
+            with DotStats(imgdata_ds) as dstats:
+                dstats.LoadDotsInfo(dot_coordinates, dot_sizes, num_dots)
+                dstats.AnalyzeDots()
+                pwm_data[:,i,colorindex] = dstats.rgbvalues[:,0] \
+                    + dstats.rgbvalues[:,1] \
+                    + dstats.rgbvalues[:,2]
+            RunShellOnChirp(all_dark_filename)
+            time.sleep(sleeptime)
+        #Gather IREF data, 100%duty cycle
+        for colorindex in range(3):
+            print('**************************************')
+            print('brightness level %d, IREF, colorindex:%d' \
+                % (brightnesslevel,colorindex))
+            if colorindex == 0:
+                RunShellOnChirp(all_red_filename)
+            if colorindex == 1:
+                RunShellOnChirp(all_green_filename)
+            if colorindex == 2:
+                RunShellOnChirp(all_blue_filename)
+            SetAllIREF(brightnesslevel)
+            imgdata = GetPictureReliably()
+            imgdata_ds = cv.addWeighted(imgdata, 1.0, all_dark_img, -1.0, 0.0)
+            with DotStats(imgdata_ds) as dstats:
+                dstats.LoadDotsInfo(dot_coordinates, dot_sizes, num_dots)
+                dstats.AnalyzeDots()
+                iref_data[:,i,colorindex] = dstats.rgbvalues[:,0] \
+                    + dstats.rgbvalues[:,1] \
+                    + dstats.rgbvalues[:,2]
+            RunShellOnChirp(all_dark_filename)
+            time.sleep(sleeptime)
+    #Now plot all data
+    ideal_tf = brightnesslevels/np.max(brightnesslevels)
+    #Aggregate LED transfer curve for PWM and IREF comparison
+    pwm_agg = np.zeros(numsteps)
+    iref_agg = np.zeros(numsteps)
+    for i in range(numsteps):
+        pwm_agg[i] = np.sum(pwm_data[:,i,:])
+        iref_agg[i] = np.sum(iref_data[:,i,:])
+    pwm_agg = pwm_agg/np.max(pwm_agg)
+    iref_agg = iref_agg/np.max(iref_agg)
+    plt.figure(figsize = (12,8), dpi = 100)
+    plt.plot(brightnesslevels, pwm_agg, 'g', linewidth = 2, label = 'PWM')
+    plt.plot(brightnesslevels, iref_agg, 'b', linewidth = 2, label = 'IREF')
+    plt.plot(brightnesslevels, ideal_tf, 'r--', linewidth = 1, label = 'ideal')
+    plt.legend( loc = 'upper left')
+    plt.title('LED transfer function')
+    plt.xlabel('8 bit input in decimal')
+    plt.ylabel('output normalized to 1.0')
+    plt.savefig('./pictures/linearity.png')
+    with open('iref_agg.txt', 'w') as f:
+        for i in range(numsteps):
+            xval = brightnesslevels[i]
+            yval = iref_agg[i]*255.0
+            f.write('%d %.3f\n' % (xval, yval))
+    #Comparison of individual LED vs 12 average for PWM, R,G,B
+    for colorindex in range(3):
+        if colorindex == 0:
+            colorletter = 'r'
+        elif colorindex == 1:
+            colorletter = 'g'
+        else:
+            colorletter = 'b'
+        plt.figure(figsize = (12,8), dpi = 100)
+        pwm_data[:,:,colorindex] = pwm_data[:,:,colorindex]/np.max(pwm_data[:,:,colorindex])
+        for i in range(numLEDs):
+            plt.plot(brightnesslevels, pwm_data[i,:,colorindex])
+            plt.title('Individual LED PWM Linearity '+colorletter)
+            plt.xlabel('8 bit input in decimal')
+            plt.ylabel('output normalized to 1.0')
+            plt.savefig('./pictures/pwm_linearity_'+colorletter+'.png')
+    #Comparison of individual LED vs 12 average for IREF
+    for colorindex in range(3):
+        if colorindex == 0:
+            colorletter = 'r'
+        elif colorindex == 1:
+            colorletter = 'g'
+        else:
+            colorletter = 'b'
+        plt.figure(figsize = (12,8), dpi = 100)
+        iref_data[:,:,colorindex] = iref_data[:,:,colorindex]/np.max(iref_data[:,:,colorindex])
+        for i in range(numLEDs):
+            plt.plot(brightnesslevels, iref_data[i,:,colorindex])
+            plt.title('Individual LED IREF Linearity '+colorletter)
+            plt.xlabel('8 bit input in decimal')
+            plt.ylabel('output normalized to 1.0')
+            plt.savefig('./pictures/iref_linearity_'+colorletter+'.png')
+    ReleaseCamera()

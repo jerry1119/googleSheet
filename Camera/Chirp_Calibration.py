@@ -1,0 +1,172 @@
+# Box Calibration
+# Run this script to calibrate the boxes
+"""
+Steps:
+* Read camera_cal.ini and Check camera serial number
+* AutoExposure
+* Take 5 pictures, all dark,all white, R, G , B, 100% duty cycle
+* Save 5 pictures
+* Perform Chirp Cal step 1 with 5 images
+* Take 3 pictures, IREF-corrected r,g,b
+* Save 3 pictures
+* Perform Chirp Cal step 2 with 3 images
+* Take 3 picture, IREF+COLOR corrected r,g,b
+* Verify calibration
+#TODO, add a text log
+"""
+# Create "camera.ini".
+exec (open('./conveniencefuncs.py').read())
+# *************************
+# start here
+raw_data_folder = 'd:\\Raw_data\\'
+verbose = True
+raw_ratio_failure_thres = 0.5
+cal_ratio_failure_thres = 0.9
+ret = InitializeCamera()
+if (ret == 1):
+    # Read device serial number, create data folder with serial number
+    snstring = GetChirpSerialNumber()
+    if verbose:
+        print('device serial number: ' + snstring)
+    results_dir = raw_data_folder + snstring + '\\'
+    if not os.path.isdir(results_dir):
+        os.system('mkdir ' + results_dir)
+    # Instantiate LED calibrator
+    led_cal = ChirpLEDCalibrator()
+    # ******************************************************************
+    # ******************************************************************
+    # Check Camera serial number, load srgbvals
+    # ******************************************************************
+    # ******************************************************************
+    cameraSN = GetCameraSerialNumber()
+    if led_cal.CheckCameraSerialNumber(cameraSN, verbose=True):
+        if verbose:
+            print('camera serial number match, proceed')
+    else:
+        if verbose:
+            print('camera serial number doesn\'t match, quit')
+        quit()
+    # ******************************************************************
+    # ******************************************************************
+    # Perform auto exposure
+    # ******************************************************************
+    # ******************************************************************
+    # Turn all LEDs to 100% duty cycle, perform auto-exposure
+    led_cal.RunShellOnChirp(led_cal.all_on_filename)
+    AutoExposure(150, 200, 1, fastmode=True)
+    # ******************************************************************
+    # ******************************************************************
+    # Take 5 pictures, all on, all dark, all green, red , blue
+    # ******************************************************************
+    # ******************************************************************
+    led_cal.RunShellOnChirp(led_cal.all_on_filename)
+    all_on_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_dark_filename)
+    all_dark_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_red_filename)
+    all_red_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_green_filename)
+    all_green_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_blue_filename)
+    all_blue_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_dark_no_iref_filename)
+    # ******************************************************************
+    # ******************************************************************
+    # Save 5 pictures
+    # ******************************************************************
+    # ******************************************************************
+    cv.imwrite(results_dir + 'all_white.png', all_on_img)
+    cv.imwrite(results_dir + 'all_dark.png', all_dark_img)
+    cv.imwrite(results_dir + 'all_red.png', all_red_img)
+    cv.imwrite(results_dir + 'all_green.png', all_green_img)
+    cv.imwrite(results_dir + 'all_blue.png', all_blue_img)
+    # ******************************************************************
+    # ******************************************************************
+    # Perform Chirp calibration Step 1
+    # ******************************************************************
+    # ******************************************************************
+    if (led_cal.ChirpCalStep1(all_on_img, \
+                              all_dark_img, \
+                              all_red_img, \
+                              all_green_img, \
+                              all_blue_img, \
+                              verbose=verbose)):
+        if verbose:
+            print('Chirp Calibration step 1 successful, proceeding to step 2')
+    else:
+        if verbose:
+            print('Chirp Calibration step 1 failed, quit')
+            quit()
+    # ******************************************************************
+    # ******************************************************************
+    # Take 3 pictures, IREF corrected r,g,b
+    # ******************************************************************
+    # ******************************************************************
+    led_cal.RunShellOnChirp(led_cal.all_red_no_iref_filename)
+    all_red_irefcal_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_green_no_iref_filename)
+    all_green_irefcal_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_blue_no_iref_filename)
+    all_blue_irefcal_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_dark_no_iref_filename)
+    # ******************************************************************
+    # ******************************************************************
+    # Save 3 pictures just taken
+    # ******************************************************************
+    # ******************************************************************
+    cv.imwrite(results_dir + 'all_red_irefcal.png', all_red_irefcal_img)
+    cv.imwrite(results_dir + 'all_green_irefcal.png', all_green_irefcal_img)
+    cv.imwrite(results_dir + 'all_blue_irefcal.png', all_blue_irefcal_img)
+    # ******************************************************************
+    # ******************************************************************
+    # Perform Chirp calibration Step 2
+    # ******************************************************************
+    # ******************************************************************
+    if (led_cal.ChirpCalStep2(all_red_irefcal_img, \
+                              all_green_irefcal_img, \
+                              all_blue_irefcal_img, \
+                              verbose=verbose)):
+        if verbose:
+            print('Chirp Calibration Step 2 successful, proceeding to final verification')
+    else:
+        if verbose:
+            print('Chirp Calibration Step 2 failed, quit')
+            quit()
+    # ******************************************************************
+    # ******************************************************************
+    # take 3 pictures of fully corrected r,g,b
+    # ******************************************************************
+    # ******************************************************************
+    led_cal.RunShellOnChirp(led_cal.mode10_no_iref_filename)
+    led_cal.DispCalibratedUniform([255, 0, 0])
+    srgb_red_img = GetPictureReliably()
+    led_cal.DispCalibratedUniform([0, 255, 0])
+    srgb_green_img = GetPictureReliably()
+    led_cal.DispCalibratedUniform([0, 0, 255])
+    srgb_blue_img = GetPictureReliably()
+    led_cal.RunShellOnChirp(led_cal.all_dark_no_iref_filename)
+    # ******************************************************************
+    # ******************************************************************
+    # save 3 pictures of fully corrected r,g,b
+    # ******************************************************************
+    # ******************************************************************
+    cv.imwrite(results_dir + 'srgb_red.png', srgb_red_img)
+    cv.imwrite(results_dir + 'srgb_green.png', srgb_green_img)
+    cv.imwrite(results_dir + 'srgb_blue.png', srgb_blue_img)
+    # ******************************************************************
+    # ******************************************************************
+    # save 3 pictures of fully corrected r,g,b
+    # ******************************************************************
+    # ******************************************************************
+    if (led_cal.VerifyChirpCalibration(srgb_red_img, \
+                                       srgb_green_img, \
+                                       srgb_blue_img, \
+                                       results_dir, \
+                                       verbose)):
+        if verbose:
+            print('Chirp Calibration successful, ship!')
+    else:
+        print('Chirp Calibration NOT successful, do NOT ship!')
+# de-init
+led_cal.RunShellOnChirp(led_cal.all_dark_filename)
+ReleaseCamera()

@@ -1,0 +1,9 @@
+import os
+#shellscript_filename = './all_on.sh'
+shellscript_filename = './GoogleCode/all_dark.sh'
+with open(shellscript_filename) as f:
+    for line in f:
+        command_string = 'adb shell ' + line
+        print(command_string)
+        os.system(command_string)
+

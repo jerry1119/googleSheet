@@ -1,0 +1,13 @@
+Test Items,Test ,Test Results,Numeric Data,Units ,Test Lower Limit,Test Upper Limit,Test Pass/Fail Criteria,Test Image Actions,Test Station S/W Actions,,,
+FCT6.1,Boot Up,Pass/Fail,N/A,N/A,N/A,N/A,,,Detect device presence over ADB,,,
+FCT6.2.2,2.4 GHz Tx/Rx Throughput Antenna 1,Pass/Fail,Throughput Readings( range from 0 to 999),Mbps,TBD,TBD,,Select right antenna, run iperf,fsdfs,frfg,
+,2.4 GHz RSSI Antenna 1,Pass/Fail,RSSI Numbers  ( range from -999 to + 999),dBm,TBD,TBD,,Select right antenna, run iperf,,,dsfdsg
+,2.4 GHz Noise Antenna 1,Pass/Fail,Noise Readings ( range from -999 to +999),dB,TBD,TBD,,Select right antenna, run iperf,dsfsdf,,
+FCT 6.2.3,2.4 GHz Tx/Rx Throughput Antenna 2,Pass/Fail,Throughput Readings( range from 0 to 999),Mbps,TBD,TBD,,Select right antenna, run iperf,,,
+,2.4 GHz RSSI Antenna 2,Pass/Fail,RSSI Numbers  ( range from -999 to + 999),dBm,TBD,TBD,,Select right antenna, run iperf,,,
+,2.4 GHz Noise Antenna 2,Pass/Fail,Noise Readings ( range from -999 to +999),dB,TBD,TBD,,Select right antenna, run iperf,,,
+FCT 6.2.4,5GHz Tx/Rx Throughput Antenna 1,Pass/Fail,Throughput Readings( range from 0 to 999),Mbps,TBD,TBD,,Select right antenna, run iperf,,,
+,5 GHz RSSI Antenna 1,Pass/Fail,RSSI Numbers  ( range from -999 to + 999),dBm,TBD,TBD,,Select right antenna, run iperf,,,
+,5GHz Noise Antenna 1,Pass/Fail,Noise Readings ( range from -999 to +999),dB,TBD,TBD,,Select right antenna, run iperf,,,
+FCT6.3.1,Bluetooth UID Test,Pass/Fail,N/A,N/A,N/A,N/A,,,,,,
+FCT 6.3.2,Bluetooth RSSI,Pass/Fail,-999 to +999,dBm,TBD,TBD,,,,,,

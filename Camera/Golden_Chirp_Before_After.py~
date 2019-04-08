@@ -1,0 +1,32 @@
+#Golden Chirp Step 1: Calibrate Iref Values, write Iref value file into Chirp
+#Golden Chirp Step 2: Measure LED primaries color coordinates with spectrometer
+#Golden Chirp Step 3: verify transformed sRGB coordinates
+#Note that Golden Chirps actually have a little residue color un-uniformity
+#which is intentional
+#This file is Step 3:
+#Calculate the universal CCM and load CCM. 
+#Then display sRGB primaries one by one again, to take measurements
+exec(open('./conveniencefuncs.py').read())
+#*************************
+#start here
+global_dimming_val = 20
+picture_directory = '.\\pictures\\Golden_Chirps\\'
+snstring = GetChirpSerialNumber()
+print('device serial number: ' + snstring)
+picture_directory = picture_directory + snstring + '\\'
+if not os.path.isdir(picture_directory):
+    os.system('mkdir ' + picture_directory)
+printcheckinfo = True
+led_cal = ChirpLEDCalibrator()
+#Initialize Golden Chirp
+led_cal.RunShellOnChirp(led_cal.mode11_filename)#Mode 11
+#show before all white
+led_cal.SetGlobalIREF(255)
+led_cal.DispRawUniform([255,255,255], global_dimming_val)
+input('press enter to continue...')
+led_cal.LoadCCMfromCoords()
+led_cal.DispCalibratedUniform([255,255,255], global_dimming_val)
+input('press enter to continue...')
+RunShellOnChirp(all_dark_filename)
+
+

@@ -1,0 +1,16 @@
+Golden Chirp step 3 file
+Each line is XYZ of corrected sRGB primary coordinates
+This file is intended for human consumption only
+1.88000e+01 9.56400e+00 9.28300e-01
+1.53500e+01 3.05300e+01 4.72700e+00
+8.23400e+00 3.96100e+00 4.20100e+01
+measu R xy: 0.642 0.327
+ideal R xy: 0.640 0.330
+measu G xy: 0.303 0.603
+ideal G xy: 0.300 0.600
+measu B xy: 0.152 0.073
+ideal B xy: 0.150 0.060
+rg ratio measu 0.313
+rg ratio ideal 0.297
+bg ratio measu 0.130
+bg ratio ideal 0.101

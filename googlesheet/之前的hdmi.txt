@@ -1,0 +1,121 @@
+try
+            {
+
+                int readtimes = 0;
+                while (true)
+                {
+                    mbSession.Write("CACL:VID:AVER:COUN 0");
+                    string readCounter = mbSession.Query("CACL:VID:AVER:COUN?");
+                    rtbFix1.AppendText(readCounter+"\n");
+                    rtbFix1.AppendText("cacl coun0:"+readtimes.ToString()+"\n");
+                    Thread.Sleep(500);
+                    readtimes++;
+                    if (readtimes == 20)
+                    {
+                        rtbFix1.AppendText("old result can't be cleared");
+                        break;
+                    }
+                    if (readCounter == "0")
+                    {
+                        rtbFix1.AppendText("readCounter"+readCounter+"\n");
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                rtbFix1.AppendText("VTSmeasError" + ex.ToString() + "\n");
+                return false;
+            }
+            try
+            {               
+                Thread.Sleep(5000);
+                Application.DoEvents();
+                int readtimes2 = 0;
+                //mbSession.Write("*TRG");
+                while (true)
+                {
+
+                    mbSession.Write("CACL:VID:AVER:COUN 8");
+                    string readCounter2 = mbSession.Query("CACL:VID:AVER:COUN?");
+                    rtbFix1.AppendText(readCounter2 + "\n");
+                    rtbFix1.AppendText("cacl coun0:" + readtimes2.ToString() + "\n");
+                    Thread.Sleep(500);
+
+                    readtimes2++;
+                    if (readtimes2 == 20)
+                    {
+                        rtbFix1.AppendText("old result can't be cleared");
+                        break;
+                    }
+                    if (int.Parse(readCounter2)> 0)
+                    {
+                        rtbFix1.AppendText("readCounter" + readCounter2 + "\n");
+                        break;
+                    }
+                    string response = mbSession.Query("*OPC?");
+                    int sfgj = Convert.ToInt32(response);
+                    string fgh = Convert.ToString(sfgj, 2);
+                    string sss = fgh.Substring(fgh.Length - 1, 1);
+                    rtbFix1.AppendText(response + "\n");
+                    rtbFix1.AppendText(sss + "\n");
+
+                    if (sss == "1")
+                    {
+                        rtbFix1.AppendText("一次测量完成");
+                        break;
+                    }
+
+                }
+               
+                //mbSession.Write("*OPC");
+            }
+            catch (Exception ex)
+            {
+
+                MessageBox.Show("Do one Test"+ex.ToString());
+                return false;
+            }
+            try
+            {
+                string VTEmeaserror = mbSession.Query("SYST:ERR:ALL?");
+                rtbFix1.AppendText(VTEmeaserror);
+
+            }
+            catch (Exception ex)
+            {
+
+                rtbFix1.AppendText("VTSmeasError" + ex.ToString() + "\n");
+                return false;
+            }
+            //mbSession = (MessageBasedSession)ResourceManager.GetLocalManager().Open("TCPIP0::192.168.0.15::inst0::INSTR");
+            //if (mbSession == null)
+            //{
+            //    MessageBox.Show("VNA is not found!");
+            //    return false;
+            //}
+            //mbSession.Timeout = 1000;
+            string HDMIfileName = SN + "-"+"BFT"+"-"+FixID+"-" + DateTime.Now.ToString("yyyyMMddhhmmss") + ".csv";
+
+
+            rtbFix1.AppendText("start save HDMIlog" + DateTime.Now.ToString());
+            try
+            {
+                mbSession.Write("MMEM:VID:MEAS:RES:Y:STOR " + "\"" + @"D:\rawdata\" + HDMIfileName + "\"");   //Set to default idn info
+            }
+            catch (Exception ex)
+            {
+
+                MessageBox.Show("Save log"+ex.ToString());
+                return false;
+            }
+            
+            //string strtmp = (mbSession.Query("*IDN?\n"));//查询同步技术*IDN
+            //string[] strsplit = strtmp.Split(',');
+            ////string Sn = "000000";
+            //foreach (string item in strsplit)
+            //{
+            //    //richTBox.AppendText("\n" + item);
+            //}
+            //mbSession.Clear();
+            return true;

@@ -1,0 +1,224 @@
+"""
+This file contains all the camera functions
+and Chirp control functions. 
+It is created as a convenience so that it is easier to manage the commonly
+used functions in a centralized location
+"""
+__author__ = 'Levon Young (levonyoung@google.com)'
+#TODO class encapsulate camera functions
+#imports
+from ctypes import *
+import sys
+import time
+import numpy as np
+import os
+import cv2 as cv
+import ctypes
+import unicodedata
+import matplotlib.pyplot as plt
+from GoogleCode.LEDfuncs import *
+#globals
+str0 = u"t.bmp"
+FileName=unicodedata.normalize('NFKD',str0).encode('ascii','ignore')
+FileNameNormal = "t.bmp"
+###Shell script file names
+all_on_filename = './GoogleCode/all_on.sh'
+all_on_no_iref_filename = './GoogleCode/all_on_no_iref.sh'
+all_green_filename = './GoogleCode/all_green.sh'
+all_green_no_iref_filename = './GoogleCode/all_green_no_iref.sh'
+all_blue_filename = './GoogleCode/all_blue.sh'
+all_blue_no_iref_filename = './GoogleCode/all_blue_no_iref.sh'
+all_red_filename = './GoogleCode/all_red.sh'
+all_red_no_iref_filename = './GoogleCode/all_red_no_iref.sh'
+all_dark_filename = './GoogleCode/all_dark.sh'
+all_dark_no_iref_filename = './GoogleCode/all_dark_no_iref.sh'
+four_dots_filename = './GoogleCode/four_dots.sh'
+mode10_filename = './GoogleCode/mode10.sh'
+mode10r_filename = './GoogleCode/mode10r.sh'
+mode10g_filename = './GoogleCode/mode10g.sh'
+mode10b_filename = './GoogleCode/mode10b.sh'
+
+Fly2 = ctypes.windll.LoadLibrary("PointGrey.dll")
+PT_SetWhiteBalance = Fly2.PT_SetWhiteBalance  #WB(Red/Blue)
+PT_SetGamma =  Fly2.PT_SetGamma  #Gamma
+PT_CamInitFromIndex = Fly2.PT_CamInitFromIndex #Initialize
+PT_CamInitFromSerial = Fly2.PT_CamInitFromSerial
+PT_StartCapture = Fly2.PT_StartCapture #Start continuous capture
+PT_FreezeCapture = Fly2.PT_FreezeCapture #Stop continuous capture
+PT_PreViewImage = Fly2.PT_PreViewImage #Pop up preview dialog
+PT_PreViewHide = Fly2.PT_PreViewHide   #Hide preview dialog
+PT_GetImageData= Fly2.PT_GetImageData #get raw data
+PT_SnapImageAndSaveBmp= Fly2.PT_SnapImageAndSaveBmp #save image
+PT_DestroyWnd =Fly2.PT_DestroyWnd #destroy preview window
+PT_SetGain = Fly2.PT_SetGain #get gain
+PT_SetShutter = Fly2.PT_SetShutter #set exposure
+PT_GetShutterRange = Fly2.PT_GetShutterRange
+PT_GetGainRange = Fly2.PT_GetGainRange
+PT_GetCamSerialNum = Fly2.PT_GetCamSerialNum
+PT_CamUnInit = Fly2.PT_CamUnInit
+#expected dot size in num pixels
+expected_dot_size = 1100
+#Data type for Raw
+class Buff(Structure):
+        _fields_ =[('Rgbdata', (c_ubyte) * (4* 2448 * 2048))]
+    
+m_pRgbData=Buff()
+m_pRgbData_p=pointer(m_pRgbData)
+#Convenience Functions
+def GetPictureReliably():
+    while(os.path.isfile(FileName) == True):
+        os.remove(FileName)
+    while(os.path.isfile(FileName) == False):
+        PT_SnapImageAndSaveBmp(FileName)
+    imgdata = cv.imread(FileNameNormal)
+    while(os.path.isfile(FileName) == True):
+        os.remove(FileName)
+    return imgdata
+    
+def SaveBmpReliably(filename = './ChirpLEDPictures/random.bmp'):
+    imgdata = GetPictureReliably()
+    cv.imwrite(filename, imgdata)
+    
+        
+def GetMaxPixelValue():
+    imgdata = GetPictureReliably()
+    blurred_img = cv.GaussianBlur(imgdata, (11,11), 0)
+    max_pixel_value = np.max(blurred_img)
+    return max_pixel_value
+    
+def GetMeanPixelValue():
+    imgdata = GetPictureReliably()
+    max_pixel_value = np.mean(imgdata)
+    return max_pixel_value
+    
+def AutoExposure(max_target_min = 150.0, 
+    max_target_max = 200.0, shutter_value = 35, fastmode = True, 
+    evmem = True):
+    """
+    AutoExposure function for Chirp LED calibration. 
+    Inputs:
+    max_target_min and max_target_max:
+    after Autoexposure, the maximum pixel value will fall between these two 
+    values
+    shutter_value: 
+    shutter value setting at the biginning of search. 
+    fastmode:
+    fast shutter value search mode, when enabled, the next search step
+    is directly calculated, when disabled, search in search_ratio steps
+    evmem:
+    When true (recommended), load the last used exposure value for potentially
+    very fast operation (one step auto exposure)
+    when disabled, start the auto exposure search using shutter_value 
+    
+    """
+    #in funciton constants
+    search_ratio = 0.9
+    evmem_filename = './autoexposurevalue.txt'
+    #load last value
+    if evmem:
+        if os.path.isfile(evmem_filename):
+            with open(evmem_filename, 'r') as f:
+                shutter_value = float(f.readline())
+    #range clipping for max/min values
+    max_target_max = np.clip(max_target_max, 100.0, 240.0)
+    max_target_min = np.clip(max_target_min, 30.0, 150.0)
+    max_target_mid = 0.5*(max_target_min + max_target_max)
+    if (max_target_min > max_target_max):
+        tempvalue = max_target_min
+        max_target_min = max_target_max
+        max_target_max = tempvalue
+    PT_SetShutter(c_float(shutter_value))
+    print("shutter set to %.3f" % (shutter_value))
+    max_pixel_value = GetMaxPixelValue()
+    print("max pixel value is %.1f" % (max_pixel_value))
+    if fastmode:
+        while max_pixel_value > max_target_max or max_pixel_value < max_target_min:
+            if max_pixel_value > 240.0:
+                shutter_value = shutter_value*0.5
+            elif max_pixel_value >= 30.0:
+                shutter_value = max_target_mid/max_pixel_value*shutter_value
+            else:
+                shutter_value = shutter_value*2
+            PT_SetShutter(c_float(shutter_value))
+            print("shutter set to %.3f" % (shutter_value))
+            max_pixel_value = GetMaxPixelValue()
+            print("max pixel value is %.1f" % (max_pixel_value))
+    else:
+        while max_pixel_value > max_target_max or max_pixel_value < max_target_min:
+            if max_pixel_value > 240.0:
+                shutter_value = shutter_value*0.5
+            elif max_pixel_value >= 30.0:
+                if max_pixel_value > max_target_mid:
+                    shutter_value = shutter_value*search_ratio
+                else:
+                    shutter_value = shutter_value/search_ratio
+            else:
+                shutter_value = shutter_value*2
+            PT_SetShutter(c_float(shutter_value))
+            print("shutter set to %.3f" % (shutter_value))
+            max_pixel_value = GetMaxPixelValue()
+            print("max pixel value is %.1f" % (max_pixel_value))
+    #Save value
+    if evmem:
+        with open(evmem_filename, 'w') as f:
+            f.write('%.20f\n' % shutter_value)      
+
+def InitializeCamera():
+    ret = PT_CamInitFromIndex(0)
+    if(ret==1):
+        print("Camera Init OK")
+        PT_SetWhiteBalance(698, 0) #--WB(Red)
+        PT_SetWhiteBalance(741, 1) #--WB(Blue)
+        PT_SetGamma(1)  #--Gamma
+        PT_SetShutter(c_float(100.000)) #--Set Shutter
+        PT_SetGain(c_float(-6.000))  #--Set Gain
+        time.sleep(1)
+    else:
+        print("Camera Init Fail")
+    return ret
+    
+def RunShellOnChirp(shellscript_filename, wait_time = 0.3, echocommands = True):
+    with open(shellscript_filename) as f:
+        for line in f:
+            command_string = 'adb shell ' + line
+            if echocommands:
+                print(command_string)
+            os.system(command_string)
+    time.sleep(wait_time)
+
+def Mode10SetBrightness(brightnessvalue, waittime = 0.3):
+    #Mode10 is the mode where global dimming is not used
+    #and all LEDs can be controlled with 0x3F
+    hexstring = "%02x" % brightnessvalue
+    command_string = 'adb shell ' + 'i2cset -f -y 0 0x15 0x3F 0x' + hexstring + ' i'
+    os.system(command_string)
+    command_string = 'adb shell ' + 'i2cset -f -y 0 0x17 0x3F 0x' + hexstring + ' i'
+    os.system(command_string)
+    time.sleep(waittime)
+
+def SetAllIREF(brightnessvalue, waittime = 0.3):
+    hexstring = "%02x" % brightnessvalue
+    command_string = 'adb shell ' + 'i2cset -f -y 0 0x15 0x40 0x' + hexstring + ' i'
+    os.system(command_string)
+    command_string = 'adb shell ' + 'i2cset -f -y 0 0x17 0x40 0x' + hexstring + ' i'
+    os.system(command_string)
+    time.sleep(waittime)    
+    
+def GetCameraSerialNumber():
+    camsn_cuint = c_uint()
+    psn = pointer(camsn_cuint)
+    PT_GetCamSerialNum(psn)
+    cameraSN = camsn_cuint.value
+    cameraSN = np.int(cameraSN)
+    return cameraSN
+    
+def ReleaseCamera():
+    PT_CamUnInit()
+    
+def GetChirpSerialNumber():
+    #TODO maybe delete serial.txt every time? keep it for now for debugging 
+    os.system('adb pull /factory/serial.txt')
+    with open('./serial.txt') as f:
+        snstring = (f.readline().split('\n'))[0]
+        return snstring
+

@@ -1,0 +1,51 @@
+exec(open('./conveniencefuncs.py').read())
+verbose = False
+foldername= 'd:\\P3_images\\'
+listofdirs = next(os.walk(foldername))[1]
+num_dirs = len(listofdirs)
+als_b_vals = np.zeros(num_dirs)
+als_l_vals = np.zeros(num_dirs)
+als_ff_num_units = 0
+als_b_empty_num_units = 0
+als_l_empty_num_units = 0
+for i in range(num_dirs):
+    current_dir = listofdirs[i]
+    if verbose:
+        print(current_dir)
+    b_filename = foldername + current_dir + '\\' + 'als_b.txt'
+    l_filename = foldername + current_dir + '\\' + 'als_l.txt'
+    f = open(b_filename, 'r')
+    linebuf = f.readline()
+    if verbose:
+        print(linebuf)
+    if len(linebuf) >= 6:
+        als_b_vals[i] = int(linebuf, 16)
+    else:
+        als_b_vals[i] = -5       
+    f.close()
+    f = open(l_filename, 'r')
+    linebuf = f.readline()
+    if verbose:
+        print(linebuf)
+    if len(linebuf) >= 6:
+        als_l_vals[i] = int(linebuf, 16)
+    else:
+        als_l_vals[i] = -5
+    f.close()
+    if als_l_vals[i] == 4095:
+        print(current_dir + ' als_l value is fff')
+        als_ff_num_units = als_ff_num_units + 1
+    if als_b_vals[i] < 0:
+        print(current_dir + ' als_b value empty')
+        als_b_empty_num_units = als_b_empty_num_units + 1
+    if als_l_vals[i] < 0:
+        print(current_dir + ' als_l value empty')
+        als_l_empty_num_units = als_l_empty_num_units + 1
+xvals = range(num_dirs)
+print('Total # of units: %d' % (num_dirs))
+print('%d units with FFF l value' % (als_ff_num_units))
+print('%d units with empty b values' % (als_b_empty_num_units))
+print('%d units with empty l values' % (als_l_empty_num_units))
+print('max b value serial number: ' + listofdirs[np.argmax(als_b_vals)])
+plt.plot(xvals, als_b_vals, 'b', xvals, als_l_vals, 'r' )
+plt.show()

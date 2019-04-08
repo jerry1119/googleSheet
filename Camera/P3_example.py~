@@ -1,0 +1,26 @@
+exec(open('./conveniencefuncs.py').read())
+#Initialize Camera
+ret = InitializeCamera()
+if (ret == 1):
+    cameraSN = GetCameraSerialNumber()
+    print('Camera Serial Number : %d' % (cameraSN) )
+    #Step 1: Turn on All LED, perform Auto Exposure
+    RunShellOnChirp(all_on_filename)
+    AutoExposure()
+    #Step 2: Take the following six pictures:
+    #All white, all dark, all red, all green, all blue, four dots
+    SaveBmpReliably('./pictures/All_White.bmp')
+    RunShellOnChirp(all_dark_filename, 1)
+    SaveBmpReliably('./pictures/All_Dark.bmp')
+    RunShellOnChirp(all_red_filename)
+    SaveBmpReliably('./pictures/All_Red.bmp')
+    RunShellOnChirp(all_green_filename)
+    SaveBmpReliably('./pictures/All_Green.bmp')
+    RunShellOnChirp(all_blue_filename)
+    SaveBmpReliably('./pictures/All_Blue.bmp')
+    RunShellOnChirp(four_dots_filename)
+    SaveBmpReliably('./pictures/Four_Dots.bmp')
+    #All done
+
+    #Release camera
+    ReleaseCamera()
